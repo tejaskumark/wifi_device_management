@@ -12,4 +12,11 @@ Things to Rememeber -
   1. nginx:latest
   2. wifi_device_management
 - If both of above containers are running, then we should be able to access UI as below from our browser http://localhost:8080
-
+- Once UI is opening user can move to FAQ section and understand prerequisite to work with different OS clients.
+- Usage flow for Tools is as below,
+  1. First Create SSID from `SSIDs` tab
+  2. Add Client Details into `Devices` tab
+  3. Once Client entry added from `Devices` tab, user can perform Connect/Disconnect to Client from UI itself.
+ 
+ 
+![image](https://user-images.githubusercontent.com/45988670/222689393-9caf741b-a937-4fb4-99e5-929edeab8cc2.png)
