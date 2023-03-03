@@ -1,0 +1,28 @@
+version: "3.4"
+
+services:
+  wifi_device_management:
+    image: wifi_device_management
+    container_name: wifi_device_management
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    volumes:
+      - .:/app
+      - $HOME:/host
+    user: ${CURRENT_UID}
+    ports:
+      - 5050
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_reverseproxy
+    depends_on:
+      - wifi_device_management
+    volumes:
+      - ./nginx/nginx-static:/usr/share/nginx/html:ro
+      - ./nginx/nginx-conf/:/etc/nginx/conf.d
+      - ./nginx/nginx-cache:/var/cache/nginx
+      - ./nginx/nginx-pid:/var/run nginx
+    ports:
+      - 8080:8080

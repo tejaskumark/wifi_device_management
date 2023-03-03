@@ -1,0 +1,1194 @@
+<html>
+
+<head>
+    <meta name="author" content="Tejaskumar Kasundra(tejaskumar.kasundra@gmail.com)">
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+        <a class="navbar-brand" href="#">WiFi Device Management Interface</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarCollapse"
+            aria-controls="navbarCollapse" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarCollapse">
+            <ul class="navbar-nav mr-auto">
+                <li class="nav-item active type">
+                    <a class="nav-link" value="client" href="#">Devices <span class="sr-only">(current)</span></a>
+                </li>
+                <li class="nav-item type">
+                    <a class="nav-link" value="ssid" href="#">SSIDs</a>
+                </li>
+                <li class="nav-item type">
+                    <a class="nav-link disabled" value="help" href="#">FAQ</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    </div>
+</head>
+
+<style>
+    td.details-control {
+        background: url('static/Datatables/resources/details_open.png') no-repeat center center;
+        cursor: pointer;
+    }
+
+    tr.details td.details-control {
+        background: url('static/Datatables/resources/details_close.png') no-repeat center center;
+    }
+
+    .th {
+        width: 100%;
+        text-align: center;
+        vertical-align: middle;
+    }
+
+    hr.header2 {
+        border: 1px solid black;
+    }
+
+
+    .table {
+        table-layout: fixed;
+    }
+
+    .table>tbody>tr>td {
+        width: 100%;
+        vertical-align: middle;
+        text-align: center;
+    }
+
+    .custom-ul {
+        list-style-type: square;
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .line-wrap {
+        word-wrap: break-word;
+        min-width: 160px;
+        max-width: 160px;
+        white-space: normal;
+    }
+</style>
+<link href="static/bootstrap-4.1.3-dist/css/bootstrap.min.css" rel="stylesheet" />
+<link href="static/Datatables/datatables.min.css" rel="stylesheet" />
+<script src="static/bootstrap-4.1.3-dist/js/jquery-3.4.1.min.js"></script>
+<script src="static/bootstrap-4.1.3-dist/js/popper.min.js"></script>
+<script src="static/bootstrap-4.1.3-dist/js/bootstrap.min.js"></script>
+<script src="static/bootstrap-4.1.3-dist/js/bootbox.js"></script>
+<script src="static/Datatables/datatables.js"></script>
+<script>
+
+    // Catch click on devices and ssid tab.
+    $(function () {
+        if ($(".nav-item").click(function () {
+            var selection = $(this).children(".nav-link").attr("value");
+            $(".type").removeClass("active");
+            $(this).addClass("active");
+            if (selection == "client") {
+                $("#ssidstag").hide();
+                $("#ssidtable").hide();
+                $("#addssidtag").hide();
+                $("#help").hide();
+                $("#addclienttag").show();
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("GET", window.location.pathname + "/get/ssids", true);
+                xhttp.send(xhttp);
+                xhttp.onreadystatechange = function () {
+                    if (this.readyState == 4 && this.status == 200) {
+                        clientssiddropdown(this.responseText);
+                        var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/clients", null);
+                        $("#clientbutton").addClass("active");
+                        ret = getresponseandexecute(ixhttp, [createclienttable]);
+                        $("#clienttable").show();
+                    };
+                    if (this.readyState == 4 && this.status != 200) {
+                        boxalert(this.responseText);
+                    };
+                };
+            };
+            if (selection == "ssid") {
+                $("#clienttable").hide();
+                $("#addclienttag").hide();
+                $("#help").hide();
+                $("#ssidstag").show();
+                $("#addssidtag").show();
+                var xhttp = apicallrequest("GET", null, window.location.pathname + "/get/ssids", null);
+                var ret = getresponseandexecute(xhttp, [createssidtable]);
+                $("#ssidtable").show();
+            };
+            if (selection == "help") {
+                $("#addclienttag").hide();
+                $("#clienttable").hide();
+                $("#addssidtag").hide();
+                $("#ssidstag").hide();
+                $("#help").show();
+            };
+        }));
+    });
+
+    var table
+    // Boxalert for given user msg string.
+    function boxalert(msg) {
+        bootbox.alert({
+            message: msg,
+            callback: function (result) {
+            }
+        });
+    };
+
+    // Wait for api call status and execute given functions and return
+    function getresponseandexecute(xhttp, funcs, api) {
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                if (funcs != null) {
+                    for (var i = 0; i < funcs.length; i++) {
+                        funcs[i](this.responseText);
+                    }
+                }
+            }
+            if (this.readyState == 4 && this.status != 200) {
+                boxalert(this.responseText);
+            }
+        };
+    };
+
+    // Execute given api call and return xhttp request handle for sync exeuction.
+    function apicallrequest(method, set_headers, api, data) {
+        var xhttp = new XMLHttpRequest();
+        xhttp.open(method, api, true);
+        if (set_headers != null) {
+            for (name in set_headers) {
+                xhttp.setRequestHeader(name, set_headers[name]);
+            }
+        }
+        if (data != null) {
+            xhttp.send(data);
+            return xhttp;
+        } else {
+            xhttp.send();
+            return xhttp;
+        }
+    };
+
+    // Verify input values and return true or false based on verification.
+    function verifyssiddata(ssid, security, passwordkey, onexuser, onexpass) {
+        if (ssid == "") {
+            boxalert("Please provide SSID name.");
+            $("#editSsidModal").modal("hide");
+            return "fail";
+        }
+        if (security == "PSK" && passwordkey == "") {
+            boxalert("Please provide password key for PSK security type.")
+            $("#editSsidModal").modal("hide");
+            return "fail";
+        }
+        if (security == "802.1x" && (onexuser == "" || onexpass == "")) {
+            boxalert("Please provide 1xUsername and 1xPassword for 802.1x security type.")
+            $("#editSsidModal").modal("hide");
+            return "fail";
+        }
+        return "success";
+    }
+
+    // This will change add client ssid dropdown dynamically.
+    function clientssiddropdown(ssid_data) {
+        ssid_list = [];
+        document.getElementById("clientssid").innerHTML = "";
+        document.getElementById("editssid").innerHTML = "";
+        var parent = document.createElement("select");
+        var parent_e = document.createElement("select");
+        parent.className = "custom-select";
+        parent_e.className = "custom-select";
+        parent.id = "clientaddssid";
+        parent_e.id = "clienteditssid";
+        parent.style = "text-align-last:center"
+        parent_e.style = "text-align-last:center"
+        var def = document.createElement("option");
+        var def_e = document.createElement("option");
+        ssid_data = JSON.parse(ssid_data);
+        if (ssid_data.length > 0) {
+            def.innerHTML = "Select SSID";
+            def_e.innerHTML = "Select SSID";
+        } else {
+            def.innerHTML = "No SSID";
+            def_e.innerHTML = "No SSID";
+        }
+        parent.appendChild(def);
+        parent_e.appendChild(def_e);
+        for (index in ssid_data) {
+            var tmp = document.createElement("option");
+            var tmp_e = document.createElement("option");
+            tmp.value = ssid_data[index]["ssid_name"];
+            tmp_e.value = ssid_data[index]["ssid_name"];
+            ssid_list.push(ssid_data[index]["ssid_name"]);
+            tmp.innerHTML = ssid_data[index]["ssid_name"];
+            tmp_e.innerHTML = ssid_data[index]["ssid_name"];
+            parent.appendChild(tmp);
+            parent_e.appendChild(tmp_e);
+        }
+        divcon = document.getElementById("clientssid");
+        divcon.appendChild(parent);
+        divco = document.getElementById("editssid");
+        divco.appendChild(parent_e);
+    }
+
+    // Fuction will create button based on input text and function.
+    function createbutton(cls, data, id, text, funtion_name) {
+        var parent = document.createElement("button");
+        parent.type = "button";
+        parent.className = cls;
+        parent.id = id;
+        if (data != null) {
+            for (ind in data) {
+                parent.setAttribute(ind, data[ind]);
+            }
+        }
+        if (funtion_name != null) {
+            parent.setAttribute("onclick", funtion_name);
+        }
+        parent.innerHTML = text;
+        return parent.outerHTML;
+    }
+
+    // connect/disconnect button toggle based on ssid selection.
+    function connecttoggle(rowid) {
+        var newvalue = $("#clientssiddropdown-" + rowid).find(":selected").text();
+        var existingvalue = $("#clientssiddropdown-" + rowid).attr("ssid");
+        if (newvalue != existingvalue) {
+            $("#submit-" + rowid).removeClass("btn-danger");
+            $("#submit-" + rowid).addClass("btn-info");
+            $("#submit-" + rowid).html("Connect");
+            $("#submit-" + rowid).attr("onclick", "connectclient(" + rowid + ")");
+        };
+        if (newvalue == existingvalue) {
+            $("#submit-" + rowid).removeClass("btn-info");
+            $("#submit-" + rowid).addClass("btn-danger");
+            $("#submit-" + rowid).html("Disconnect");
+            $("#submit-" + rowid).attr("onclick", "disconnectclient(" + rowid + ")");
+        };
+    };
+
+    // This will create dynamic dropdown dynamically per client row.
+    function clientssiddrop(configured_ssid, rowid, client_status) {
+        var parent = document.createElement("select");
+        parent.className = "custom-select";
+        parent.id = "clientssiddropdown-" + rowid;
+        parent.setAttribute("ssid", configured_ssid);
+        parent.style = "text-align-last:center; width:200px;"
+        parent.setAttribute("onchange", "connecttoggle(" + rowid + ")");
+        if (client_status == "2" || client_status == "4") {
+            parent.setAttribute("disabled", true);
+        }
+        if (ssid_list.length == 0) {
+            var tmp = document.createElement("option");
+            tmp.value = "nossid";
+            tmp.innerHTML = "Add SSID";
+            parent.appendChild(tmp);
+            return parent;
+        }
+        var set = 0;
+        for (index in ssid_list) {
+            var tmp = document.createElement("option");
+            tmp.value = ssid_list[index];
+            if (tmp.value == configured_ssid) {
+                tmp.setAttribute("selected", true);
+                set = 1;
+            }
+            tmp.innerHTML = ssid_list[index];
+            parent.appendChild(tmp);
+        }
+        if (set == 0) {
+            var tmp = document.createElement("option");
+            // tmp.value = "nossid";
+            tmp.setAttribute("selected", true);
+            tmp.innerHTML = "Select SSID";
+            parent.appendChild(tmp);
+        }
+        return parent.outerHTML
+    }
+
+    // Verify client data before adding to db.
+    function verifyclientdata(clientos, clientname, lanip, wifiinterface,
+        sshusername, sshupassword, clientaddssid) {
+        if (clientos != "Select OS" && clientname && lanip && wifiinterface
+            && sshusername && sshpassword && clientaddssid != "Select SSID") {
+            return "success";
+        } else {
+            $("#editclientmodal").modal("hide");
+            boxalert("Please provide all parameter while adding client.");
+            return "fail";
+        }
+    };
+
+    // Function to create ssid table.
+    function createssidtable(ssid_data) {
+        JSONConvert = JSON.parse(ssid_data);
+        $("#ssidstable").DataTable({
+            "pageLength": 25,
+            "createdRow": function (row, data) {
+                row.id = data["rowid"];
+            },
+            "destroy": true,
+            "data": JSONConvert,
+            "columns": [
+                {
+                    "data": "ssid_name",
+                    "class": "line-wrap"
+                },
+                {
+                    "data": "security",
+                    "class": "line-wrap"
+                },
+                {
+                    "data": "passwordkey",
+                    "class": "line-wrap"
+                },
+                {
+                    "data": "onex_user",
+                    "class": "line-wrap"
+                },
+                {
+                    "data": "onex_pass",
+                    "class": "line-wrap"
+                },
+                {
+                    "data": "rowid",
+                    "render": function (data, type, row) {
+                        var tmp = row["rowid"] + "," + "\"" + row["ssid_name"] +
+                            "\"" + "," + 1 + "," + 0;
+                        var del = createbutton("btn btn-sm btn-danger mr-2", null, row["rowid"],
+                            "Delete", "confirmdelete(" + tmp + ")");
+                        tmp = { "data-toggle": "modal", "data-target": "#editSsidModal" };
+                        var edit = createbutton("btn btn-sm btn-info", tmp, row["rowid"],
+                            "Edit", null);
+                        return del + edit;
+                    }
+                }
+            ]
+
+        });
+    };
+
+    // To create client table
+    function createclienttable(client_data) {
+        JSONConvert = JSON.parse(client_data);
+        $("#clientstable").DataTable({
+            "pageLength": 25,
+            "columnDefs": [
+                { "width": "8px", "targets": 0 },
+                { "width": "100px", "targets": 1 },
+                { "width": "120px", "targets": 2 },
+                { "width": "180px", "targets": 3 },
+                { "width": "130px", "targets": 4 },
+                { "width": "150px", "targets": 5 },
+                { "width": "100px", "targets": 6 },
+                { "width": "140px", "targets": 7 },
+                { "width": "120px", "targets": 8 },
+            ],
+            "createdRow": function (row, data) {
+                row.id = "client-" + data["rowid"];
+            },
+            "destroy": true,
+            "data": JSONConvert,
+            "columns": [
+                {
+                    "className": "details-control",
+                    "orderable": false,
+                    "data": null,
+                    "defaultContent": "",
+                },
+                {
+                    "data": "device_name",
+                    "class": "line-wrap"
+                },
+                {
+                    "data": "device_lan_ip",
+                    "class": "line-wrap"
+                },
+                {
+                    "orderable": false,
+                    "data": "rowid",
+                    "render": function (data, type, row) {
+                        return clientssiddrop(row["device_ssid"], row["rowid"],
+                            row["device_status"])
+                    }
+                },
+                {
+                    "orderable": false,
+                    "data": "rowid",
+                    "render": function (data, type, row) {
+                        if (row["device_status"] == "1") {
+                            if (ssid_list.length == 0) {
+                                tmp = { "disabled": true }
+                                return createbutton("btn btn-sm btn-info", tmp, "submit-" + row["rowid"],
+                                    "Connect", "connectclient(" + row["rowid"] + ")");
+                            } else {
+                                return createbutton("btn btn-sm btn-info", null, "submit-" + row["rowid"],
+                                    "Connect", "connectclient(" + row["rowid"] + ")");
+                            }
+                        } else if (row["device_status"] == "2") {
+                            tmp = { "disabled": true }
+                            return createbutton("btn btn-sm btn-info", tmp, "submit-" + row["rowid"],
+                                "Connecting", null);
+                        } else if (row["device_status"] == "3") {
+                            return createbutton("btn btn-sm btn-danger", null, "submit-" + row["rowid"],
+                                "Disconnect", "disconnectclient(" + row["rowid"] + ")");
+                        } else {
+                            tmp = { "disabled": true }
+                            return createbutton("btn btn-sm btn-danger", tmp, "submit-" + row["rowid"],
+                                "Disconnecting", null);
+                        }
+                    }
+                },
+                {
+                    "data": "device_info",
+                    "class": "device-status line-wrap"
+                },
+                {
+                    "orderable": false,
+                    "data": "device_wifi_ip",
+                    "class": "wifi-ip line-wrap"
+                },
+                {
+                    "orderable": false,
+                    "data": "device_wifi_bssid",
+                    "class": "wifi-bssid line-wrap"
+                },
+                {
+                    "orderable": false,
+                    "data": "rowid",
+                    "render": function (data, type, row) {
+                        tmp = row["rowid"] + "," + null + "," + null + "," + 1;
+                        del = createbutton("btn btn-sm btn-danger mr-2", null, row["rowid"],
+                            "Delete", "confirmdelete(" + tmp + ")", null)
+                        tmp = { "data-toggle": "modal", "data-target": "#editclientmodal" }
+                        edit = createbutton("btn btn-sm btn-info", tmp, row["rowid"],
+                            "Edit", null)
+                        return del + edit
+                    }
+                },
+            ],
+            "order": [[1, 'asc']]
+        })
+
+    };
+
+    // For row-details show/hide
+    function format(d) {
+        // `d` is the original data object for the row
+        if (d.device_wifi_mac == null) {
+            d.device_wifi_mac = "--"
+        }
+        return "<div style=\"text-align: left\"><b>WiFi Interface: " + d.device_wifi_interface + "<br>" +
+            " WiFi MAC: " + d.device_wifi_mac + "<br>" +
+            " Client OS: " + d.device_os + "<br>" +
+            " SSH Username: " + d.device_ssh_user + "<br>" +
+            " SSH Password: " + d.device_ssh_pass + "<br>" + "</b></div>";
+    }
+
+    // Function to run on page load and catch Add SSID and Add Client or Client details 
+    // hide or show accordingly.
+    $(document).ready(function () {
+        $("#clientstable").on("click", "tr td.details-control", function () {
+            var tr = $(this).closest('tr');
+            var td = $(this).closest('td');
+            var tt = $("#clientstable").DataTable();
+            var row = tt.row(tr);
+            if (row.child.isShown()) {
+                tr.removeClass('details');
+                row.child.hide();
+            }
+            else {
+                row.child(format(row.data())).show();
+                tr.addClass("details style=\"text-align:left\"");
+                td.style = "text-align:left"
+            }
+        });
+
+        $("#addssid").click(function () {
+            var stat = "";
+            stat = verifyssiddata($("#ssidname").val(), $("#ssidsecurity").val(),
+                $("#passwordkey").val(), $("#1xusername").val(), $("#1xpassword").val());
+            if (stat == "success") {
+                var data = {}
+                data["ssidname"] = $("#ssidname").val();
+                data["security"] = $("#ssidsecurity").val();
+                data["passwordkey"] = $("#passwordkey").val();
+                data["onexuser"] = $("#1xusername").val();
+                data["onexpass"] = $("#1xpassword").val();
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("POST", window.location.pathname + "/add/ssid", true);
+                xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8")
+                xhttp.send(JSON.stringify(data));
+                xhttp.onreadystatechange = function () {
+                    if (this.readyState == 4 && this.status == 200) {
+                        var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/ssids", null);
+                        var iret = getresponseandexecute(ixhttp, [clientssiddropdown, createssidtable]);
+                        $("#ssidname").val("");
+                        $("#ssidsecurity").val("PSK");
+                        $("#passwordkey").val("");
+                        $("#1xusername").val("");
+                        $("#1xpassword").val("");
+                    };
+                    if (this.readyState == 4 && this.status != 200) {
+                        boxalert(this.responseText);
+                    };
+                }
+            };
+        });
+        $("#addclient").click(function () {
+            var stat = "";
+            stat = verifyclientdata($("#clientos").val(), $("#clientname").val(),
+                $("#lanip").val(), $("#wifiinterface").val(),
+                $("#sshusername").val(), $("#sshupassword").val(), $("#clientaddssid").val());
+            if (stat == "success") {
+                var data = {};
+                data["clientos"] = $("#clientos").val();
+                data["clientname"] = $("#clientname").val();
+                data["lanip"] = $("#lanip").val();
+                data["sshusername"] = $("#sshusername").val();
+                data["sshpassword"] = $("#sshpassword").val();
+                data["wifiinterface"] = $("#wifiinterface").val();
+                data["ssidname"] = $("#clientaddssid").val();
+                var xhttp = new XMLHttpRequest();
+                xhttp.open("POST", window.location.pathname + "/add/client", true);
+                xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8")
+                xhttp.send(JSON.stringify(data));
+                xhttp.onreadystatechange = function () {
+                    if (this.readyState == 4 && this.status == 200) {
+                        var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/clients", null);
+                        var iret = getresponseandexecute(ixhttp, [createclienttable]);
+                        $("#clientos").val("Select OS");
+                        $("#clientname").val("");
+                        $("#lanip").val("");
+                        $("#wifiinterface").val("");
+                        $("#sshusername").val("");
+                        $("#sshpassword").val("");
+                        $("#clientaddssid").val("Select SSID");
+                    };
+                    if (this.readyState == 4 && this.status != 200) {
+                        boxalert(this.responseText);
+                    };
+                };
+            };
+        });
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("GET", window.location.pathname + "/get/ssids", true);
+        xhttp.send(xhttp);
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                clientssiddropdown(this.responseText);
+                var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/clients", null);
+                $("#ssidstag").hide();
+                $("#addssidtag").hide();
+                $("#ssidtable").hide();
+                $("#addclienttag").show();
+                $("#clientbutton").addClass("active");
+                ret = getresponseandexecute(ixhttp, [createclienttable]);
+                $("#clienttable").show();
+            }
+            if (this.readyState == 4 && this.status != 200) {
+                boxalert(this.responseText);
+            }
+        };
+    });
+
+    // Delete record from db for given rowid
+    function confirmdelete(rowid, ssid_name, ssid_flag, client_flag) {
+        if (ssid_flag == 1) {
+            msg = "Ahh !! Do you really want to delete SSID?"
+        } else if (client_flag == 1) {
+            msg = "Ahh !! Do you really want to delete Client?"
+        } else {
+            msg = "Ahh !! Do you really want to delete?"
+        }
+        bootbox.confirm({
+            message: msg,
+            buttons: {
+                confirm: {
+                    label: 'Yes',
+                    className: 'btn-success'
+                },
+                cancel: {
+                    label: 'No',
+                    className: 'btn-danger'
+                }
+            },
+            callback: function (result) {
+                if (result) {
+                    if (ssid_flag == 1) {
+                        data = {};
+                        data["id"] = rowid;
+                        data["ssid_name"] = ssid_name;
+                        var xhttp = new XMLHttpRequest();
+                        xhttp.open("DELETE", window.location.pathname + "/delete/ssid", true);
+                        xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8")
+                        xhttp.send(JSON.stringify(data));
+                        xhttp.onreadystatechange = function () {
+                            if (this.readyState == 4 && this.status == 200) {
+                                var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/ssids", null);
+                                getresponseandexecute(ixhttp, [createssidtable, clientssiddropdown]);
+                            };
+                            if (this.readyState == 4 && this.status != 200) {
+                                boxalert(this.responseText);
+                            }
+                        };
+                    } else if (client_flag == 1) {
+                        data = {};
+                        data["id"] = rowid;
+                        var xhttp = new XMLHttpRequest();
+                        xhttp.open("DELETE", window.location.pathname + "/delete/client", true);
+                        xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8")
+                        xhttp.send(JSON.stringify(data));
+                        xhttp.onreadystatechange = function () {
+                            if (this.readyState == 4 && this.status == 200) {
+                                var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/clients", null);
+                                getresponseandexecute(ixhttp, [createclienttable]);
+                            };
+                            if (this.readyState == 4 && this.status != 200) {
+                                boxalert(this.responseText);
+                            };
+                        };
+                    } else {
+                        console.log("Nothing to delete.");
+                    }
+                }
+            }
+        });
+    };
+
+    // On click modal event catch and populate existing data from row for ssid.
+    $(document).on('show.bs.modal', '#editSsidModal', function (event) {
+        var button = $(event.relatedTarget);
+        var modal = $(this);
+        modal.find('.modal-body #editssidname').
+            val(button.closest("tr").find("td:nth-child(1)").text());
+        modal.find('.modal-body #editssidsecurity').
+            val(button.closest("tr").find("td:nth-child(2)").text());
+        modal.find('.modal-body #editpasswordkey').
+            val(button.closest("tr").find("td:nth-child(3)").text());
+        modal.find('.modal-body #editonexuser').
+            val(button.closest("tr").find("td:nth-child(4)").text());
+        modal.find('.modal-body #editonexpass').
+            val(button.closest("tr").find("td:nth-child(5)").text());
+        modal.find('.modal-body #id').val(button.closest('tr').attr('id'));
+    });
+
+    // On click modal event catch and populate existing data from row for client.
+    $(document).on('show.bs.modal', '#editclientmodal', function (event) {
+        var button = $(event.relatedTarget);
+        var modal = $(this);
+        modal.find('.modal-body #id').val(button.closest('tr').attr('id'));
+        edit_client_id = button.closest('tr').attr('id');
+        console.log(edit_client_id);
+        url = window.location.pathname + "/get/client?id=" + button.closest('tr').attr('id');
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("GET", url, true);
+        xhttp.send();
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                var res = JSON.parse(this.responseText);
+                modal.find('.modal-body #editclientname').
+                    val(res[0].device_name);
+                modal.find('.modal-body #editlanip').
+                    val(res[0].device_lan_ip);
+                modal.find('.modal-body #clienteditssid').
+                    val(res[0].device_ssid);
+                modal.find('.modal-body #editclientos').
+                    val(res[0].device_os);
+                modal.find('.modal-body #editsshuser').
+                    val(res[0].device_ssh_user);
+                modal.find('.modal-body #editsshpass').
+                    val(res[0].device_ssh_pass);
+                modal.find('.modal-body #editwifiinterface').
+                    val(res[0].device_wifi_interface);
+            }
+            if (this.readyState == 4 && this.status != 200) {
+                $("#editclientmodal").modal("hide");
+                boxalert(this.responseText);
+            }
+        };
+    });
+
+    // Editssid function to edit any existing ssid.
+    function editssid() {
+        data = {};
+        data["ssidname"] = $("#editssidname").val();
+        data["security"] = $("#editssidsecurity").val();
+        data["passwordkey"] = $("#editpasswordkey").val();
+        data["onexuser"] = $("#editonexuser").val();
+        data["onexpass"] = $("#editonexpass").val();
+        data["id"] = $("#id").val();
+        stat = verifyssiddata(data["ssidname"], data["security"], data["passwordkey"],
+            data["onexuser"], data["onexpass"]);
+        if (stat == "fail") {
+            return;
+        }
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("POST", window.location.pathname + "/edit/ssid", true);
+        xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8")
+        xhttp.send(JSON.stringify(data));
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                $("#editSsidModal").modal("hide");
+                var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/ssids", null);
+                getresponseandexecute(ixhttp, [createssidtable, clientssiddropdown]);
+            };
+            if (this.readyState == 4 && this.status != 200) {
+                boxalert(this.responseText)
+            }
+        };
+    };
+
+    // Editclient function to edit any existing client details.
+    function editclient() {
+        data = {};
+        data["id"] = edit_client_id;
+        data["device_name"] = $("#editclientname").val();
+        data["device_lan_ip"] = $("#editlanip").val();
+        if ($("#clienteditssid").val() != "No SSID" && $("#clienteditssid").val() != "Select SSID") {
+            data["device_ssid"] = $("#clienteditssid").val();
+        } else {
+            data["device_ssid"] = null;
+        }
+        data["device_ssh_user"] = $("#editsshuser").val();
+        data["device_ssh_pass"] = $("#editsshpass").val();
+        data["device_wifi_interface"] = $("#editwifiinterface").val();
+        data["device_os"] = $("#editclientos").val();
+        stat = verifyclientdata(data["device_os"], data["device_name"], data["device_lan_ip"],
+            data["device_wifi_interface"], data["device_ssh_user"],
+            data["device_ssh_pass"], data["device_ssid"]);
+        if (stat == "fail") {
+            return;
+        }
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("POST", window.location.pathname + "/edit/client", true);
+        xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8")
+        xhttp.send(JSON.stringify(data));
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                $("#editclientmodal").modal("hide");
+                var ixhttp = apicallrequest("GET", null, window.location.pathname + "/get/clients", null);
+                getresponseandexecute(ixhttp, [createclienttable]);
+            };
+            if (this.readyState == 4 && this.status != 200) {
+                boxalert(this.responseText);
+            };
+        };
+    };
+
+    // Connectclient will connect client to specified ssid.
+    function connectclient(rowid) {
+        if ($("#clientssiddropdown-" + rowid).val() == "Select SSID") {
+            boxalert("Please select SSID from available options.")
+            return
+        };
+        $("#clientssiddropdown-" + rowid).attr("disabled", true);
+        $("#submit-" + rowid).html("Connecting");
+        $("#submit-" + rowid).attr("disabled", true);
+        $("#client-" + rowid + " td.device-status").html("--");
+        $("#client-" + rowid + " td.wifi-bssid").html("--");
+        $("#client-" + rowid + " td.wifi-ip").html("--");
+        var data = {}
+        data["id"] = rowid;
+        data["ssid"] = $("#clientssiddropdown-" + rowid).val();
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("POST", window.location.pathname + "/connect/client", true);
+        xhttp.timeout = 300000;
+        xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        xhttp.send(JSON.stringify(data));
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                var res = JSON.parse(this.responseText);
+                if (res["status_code"] == 1) {
+                    $("#clientssiddropdown-" + rowid).removeAttr("disabled", true);
+                    $("#clientssiddropdown-" + rowid).attr("ssid", data["ssid"]);
+                    $("#submit-" + rowid).html("Disconnect");
+                    $("#submit-" + rowid).removeClass("btn-info");
+                    $("#submit-" + rowid).addClass("btn-danger");
+                    $("#submit-" + rowid).removeAttr("disabled", true);
+                    $("#submit-" + rowid).attr("onclick", "disconnectclient(" + rowid + ")");
+                    $("#client-" + rowid + " td.device-status").html(res["status_info"]);
+                    $("#client-" + rowid + " td.wifi-bssid").html(res["bssid"]);
+                    $("#client-" + rowid + " td.wifi-ip").html(res["wifiip"]);
+                };
+                if (res["status_code"] == 0) {
+                    $("#clientssiddropdown-" + rowid).removeAttr("disabled", true);
+                    $("#clientssiddropdown-" + rowid).attr("ssid", data["ssid"]);
+                    $("#submit-" + rowid).html("Connect");
+                    $("#submit-" + rowid).removeClass("btn-danger");
+                    $("#submit-" + rowid).addClass("btn-info");
+                    $("#submit-" + rowid).removeAttr("disabled", true);
+                    $("#submit-" + rowid).attr("onclick", "connectclient(" + rowid + ")");
+                    $("#client-" + rowid + " td.device-status").html(res["status_info"]);
+                    $("#client-" + rowid + " td.wifi-bssid").html(res["bssid"]);
+                    $("#client-" + rowid + " td.wifi-ip").html(res["wifiip"]);
+                };
+
+            }
+            if (this.readyState == 4 && this.status != 200) {
+                boxalert(this.responseText);
+            }
+        };
+    };
+
+    // Diconnectclient will disconnect client from specified ssid.
+    function disconnectclient(rowid) {
+        $("#clientssiddropdown-" + rowid).attr("disabled", true);
+        $("#submit-" + rowid).html("Disconnecting");
+        $("#submit-" + rowid).attr("disabled", true);
+        $("#client-" + rowid + " td.device-status").html("--");
+        $("#client-" + rowid + " td.wifi-bssid").html("--");
+        $("#client-" + rowid + " td.wifi-ip").html("--");
+        var data = {}
+        data["id"] = rowid;
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("POST", window.location.pathname + "/disconnect/client", true);
+        xhttp.timeout = 300000;
+        xhttp.setRequestHeader("Content-Type", "application/json;charset=UTF-8");
+        xhttp.send(JSON.stringify(data));
+        xhttp.onreadystatechange = function () {
+            if (this.readyState == 4 && this.status == 200) {
+                var res = JSON.parse(this.responseText);
+                $("#clientssiddropdown-" + rowid).removeAttr("disabled", true);
+                $("#submit-" + rowid).html("Connect");
+                $("#submit-" + rowid).removeClass("btn-danger");
+                $("#submit-" + rowid).addClass("btn-info");
+                $("#submit-" + rowid).removeAttr("disabled", true);
+                $("#submit-" + rowid).attr("onclick", "connectclient(" + rowid + ")");
+                $("#client-" + rowid + " td.device-status").html(res["status_info"]);
+                $("#client-" + rowid + " td.wifi-bssid").html(res["bssid"]);
+                $("#client-" + rowid + " td.wifi-ip").html(res["wifiip"]);
+            }
+            if (this.readyState == 4 && this.status != 200) {
+                boxalert(this.responseText);
+            }
+        };
+    };
+
+</script>
+
+<body>
+    <div class="container-fluid">
+        <div id="ssidstag">
+            <div id="addssidtag">
+                <h5>SSID Details
+                    <hr class="header2">
+                </h5>
+                <div class="form-row">
+                    <div class="input-group mb-3 col-md-4">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">SSID</span>
+                        </div>
+                        <input type="text" id="ssidname" class="form-control text-center">
+                    </div>
+                    <div class="input-group mb-3 col-md-4">
+                        <div class="input-group-prepend">
+                            <label class="input-group-text">Security</label>
+                        </div>
+                        <select class="custom-select" id="ssidsecurity" style="text-align-last:center">
+                            <option selected value="PSK">PSK</option>
+                            <option value="OPEN">OPEN</option>
+                            <option value="802.1x">802.1x</option>
+                        </select>
+                    </div>
+                    <div class="input-group mb-3 col-md-4">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">Password Key</span>
+                        </div>
+                        <input type="text" id="passwordkey" class="form-control text-center">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group mb-3 col-md-4">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">1x Username</span>
+                        </div>
+                        <input type="text" id="1xusername" class="form-control text-center">
+                    </div>
+                    <div class="input-group mb-3 col-md-4">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">1x Password</span>
+                        </div>
+                        <input type="text" id="1xpassword" class="form-control text-center">
+                    </div>
+                    <div class="mb-3 col-md-4 text-center">
+                        <button class="btn btn-outline-secondary" id="addssid" type="button">Add SSID</button>
+                    </div>
+                </div>
+            </div>
+            <br>
+            <br>
+            <div id="ssidtable">
+                <table id="ssidstable" class="table table-sm display" style="width: 100%">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th class="th">SSID</th>
+                            <th class="th">Security</th>
+                            <th class="th">PSK</th>
+                            <th class="th">1xUser</th>
+                            <th class="th">1xPass</th>
+                            <th class="th"></th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+        <div id="clientstag">
+            <div id="addclienttag" style="display:none">
+                <h5>Device Details
+                    <hr class="header2">
+                </h5>
+                <div class="form-row">
+                    <div class="input-group mb-3 col-md-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">Device Name</span>
+                        </div>
+                        <input type="text" id="clientname" class="form-control text-center">
+                    </div>
+                    <div class="input-group mb-3 col-md-3">
+                        <select class="custom-select" id="clientos" style="text-align-last:center">
+                            <option selected>Select OS</option>
+                            <option value="Ubuntu">Ubuntu</option>
+                            <option value="Windows">Windows</option>
+                            <option value="RasPi">RasPi</option>
+                            <option value="Mac">Mac</option>
+                        </select>
+                    </div>
+                    <div class="input-group mb-3 col-md-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">LAN IP</span>
+                        </div>
+                        <input type="text" id="lanip" class="form-control text-center">
+                    </div>
+                    <div class="input-group mb-3 col-md-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">WiFi Interface</span>
+                        </div>
+                        <input type="text" id="wifiinterface" class="form-control text-center">
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="input-group mb-3 col-md-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">SSH Username</span>
+                        </div>
+                        <input type="text" id="sshusername" class="form-control text-center">
+                    </div>
+                    <div class="input-group mb-3 col-md-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text">SSH Password</span>
+                        </div>
+                        <input type="text" id="sshpassword" class="form-control text-center">
+                    </div>
+                    <div id="clientssid" class="input-group mb-3 col-md-3"></div>
+                    <div class="mb-3 col-md-3 text-center">
+                        <button class="btn btn-outline-secondary" id="addclient" type="button">Add Device</button>
+                    </div>
+                </div>
+                <br>
+            </div>
+            <div id="clienttable">
+                <table id="clientstable" class="table table-sm display" style="width: 100%">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th class="th"> </th>
+                            <th class="th">Name</th>
+                            <th class="th">LAN IP</th>
+                            <th class="th">SSID</th>
+                            <th class="th"></th>
+                            <th class="th">Status</th>
+                            <th class="th">WiFi IP</th>
+                            <th class="th">BSSID</th>
+                            <th class="th"></th>
+                        </tr>
+                    </thead>
+                </table>
+            </div>
+        </div>
+
+        <div id="help" style="display: none;">
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>1) What are steps to connect device?</strong>
+                </span>
+            <ul>
+                <li>Add SSID from SSIDs section.</li>
+                <li>Add Device from Device section.</li>
+                <li>Now you can connect/disconnect device from SSID from device section.</li>
+            </ul>
+            </p>
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>2) What are prerequisites for tool to work?</strong>
+                </span>
+            <ul>
+                <li>SSH must be working with provided SSH username and password.</li>
+                <li>SCP for file transfer must be working with provided SSH username and password.</li>
+            </ul>
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>3) What are prerequisites for Mac OS Device?</strong>
+                </span>
+            <ul>
+                <li>SSH password for "root" user and logged-in user must be same.</li>
+            </ul>
+            </p>
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>4) What is logged-in user for Mac OS Device?</strong>
+                </span>
+            <ul>
+                <li>User with which we log in to Device for GUI access.</li>
+            </ul>
+            </p>
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>5) What are prerequisites for Ubuntu OS Device?</strong>
+                </span>
+            <ul>
+                <li>Ubuntu 16.04(Xenial Xerus) or later release supported.</li>
+                <li>It is possible that older release may work, but not tested at this point.</li>
+            </ul>
+            </p>
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>6) What are prerequisites for RaspberryPi OS Device?</strong>
+                </span>
+            <ul>
+                <li>wpa_supplicant and dhclient should be present on device.</li>
+            </ul>
+            </p>
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>7) What are prerequisites for Windows OS Device?</strong>
+                </span>
+            <ul>
+                <li>SSH and SCP should be working with provided username and password.</li>
+            </ul>
+            </p>
+            <p class="custom-ul">
+                <span style="color: #ff6600;">
+                    <strong>8) Why Windows OS Device not connecting?</strong>
+                </span>
+            <ul>
+                <li>For windows devices, to connect Ethernet and WiFi interface at same time,
+                    we need to set some registry value.
+                </li>
+                <li>Follow this
+                    <a target="_blank"
+                        href="https://answers.microsoft.com/en-us/windows/forum/all/windows-10-not-connect-to-wifi-automatically-when/0cda7a70-6e1d-4ed9-a370-41581970ba73">
+                        Article</a>
+                    or contact @tejaskumar.kasundra to configure registry values.
+                </li>
+            </ul>
+            </p>
+
+        </div>
+        <div class="modal fade" id="editSsidModal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editSsidModallable">Edit SSID</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <input type="hidden" class="form-control" id="id" name="id">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editssid">SSID</label>
+                            <input type="text" class="form-control" name="editssidname" id="editssidname">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editsecurity">Security</label>
+                            <select class="custom-select" id="editssidsecurity">
+                                <option selected value="PSK">PSK</option>
+                                <option value="OPEN">OPEN</option>
+                                <option value="802.1x">802.1x</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editpasswordkey">PasswordKey</label>
+                            <input type="text" class="form-control" name="editpasswordkey" id="editpasswordkey">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editonexuser">1xUsername</label>
+                            <input type="text" class="form-control" name="editonexuser" id="editonexuser">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editonexpass">1xPassword</label>
+                            <input type="text" class="form-control" name="editonexpass" id="editonexpass">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" id="modal-submit" onclick="editssid()">Save
+                            changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal fade" id="editclientmodal" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="editclientmodal">Edit Client Details</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="form-group">
+                            <input type="hidden" class="form-control" id="id" name="id">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editclient">Client</label>
+                            <input type="text" class="form-control" name="editclientname" id="editclientname">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editlanip">LAN IP</label>
+                            <input type="text" class="form-control" name="editlanip" id="editlanip">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editssid">Select SSID</label>
+                            <div id="editssid"></div>
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editclientos">Select OS</label>
+                            <select class="custom-select" id="editclientos" style="text-align-last:center">
+                                <option selected value="Ubuntu">Ubuntu</option>
+                                <option value="Mac">Mac</option>
+                                <option value="Windows">Windows</option>
+                                <option value="RasPi">RasPi</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editwifiinterface">WiFi Interface</label>
+                            <input type="text" class="form-control" name="editwifiinterface" id="editwifiinterface">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editsshuser">SSH Username</label>
+                            <input type="text" class="form-control" name="editsshuser" id="editsshuser">
+                        </div>
+                        <div class="form-group">
+                            <label class="font-weight-bold ml-1" for="editsshpass">SSH Password</label>
+                            <input type="text" class="form-control" name="editsshpass" id="editsshpass">
+                        </div>
+
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button type="button" class="btn btn-primary" id="modal-submit" onclick="editclient()">Save
+                            changes</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
