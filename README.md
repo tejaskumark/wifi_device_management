@@ -1,5 +1,5 @@
 # WiFi Clients Management Remotely
-Connect Different OS Clients Windows, Mac, Ubuntu, Raspberry Pi to WiFi Remotely
+Connect Different OS Clients Windows, Mac, Ubuntu, RaspberryPi to WiFi Remotely
 
 - It is a docker/container based, so to run this on any machine user can follow below simple steps.
 
