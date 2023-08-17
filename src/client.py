@@ -834,7 +834,7 @@ class WindowsClient(Client):
                     (self.client_dict["device_ssid"],
                         self.client_dict['onex_username'],
                         self.client_dict['onex_password']))
-                if out == "1":
+                if "ERROR" in out:
                     self.status["status_info"] = "802.1X Settings Failed."
                     self.status["status_code"] = 0
                     self.status["bssid"] = "--"
